@@ -6,56 +6,64 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Service
-public class EmployeeServiceImpl implements EmployeeService{
+public class EmployeeServiceImpl implements EmployeeService {
 
+    private final EmployeeRepository employeeRepository;
+
+    // Constructor injection for better testability and immutability
     @Autowired
-    private EmployeeRepository employeeRepository;
+    public EmployeeServiceImpl(EmployeeRepository employeeRepository) {
+        this.employeeRepository = employeeRepository;
+    }
 
     @Override
     public Employee saveEmployee(Employee employee) {
+        // Validate employee details before saving
+        if (employee.getEmployeeName() == null || employee.getEmployeeName().isEmpty()) {
+            throw new IllegalArgumentException("Employee name cannot be null or empty");
+        }
+        if (employee.getEmployeeSalary() <= 0) {
+            throw new IllegalArgumentException("Employee salary must be greater than 0");
+        }
         return employeeRepository.save(employee);
     }
 
     @Override
     public List<Employee> fetchAllEmployees() {
         List<Employee> allEmployees = employeeRepository.findAll();
+        if (allEmployees.isEmpty()) {
+            throw new RuntimeException("No employees found in the database");
+        }
         return allEmployees;
     }
 
     @Override
     public Employee getEmployeeById(Long id) {
-        Optional<Employee> employee = employeeRepository.findById(id);
-        if (employee.isPresent()) {
-            return employee.get();
-        }
-        return null;
+        return employeeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employee not found with id: " + id));
     }
 
     @Override
     public Employee updateEmployeeById(Long id, Employee employee) {
-        Optional<Employee> employee1 = employeeRepository.findById(id);
-
-        if (employee1.isPresent()) {
-            Employee originalEmployee = employee1.get();
-
-            if (Objects.nonNull(employee.getEmployeeName()) && !"".equalsIgnoreCase(employee.getEmployeeName())) {
+        return employeeRepository.findById(id).map(originalEmployee -> {
+            // Update employee name if it's non-null and non-empty
+            if (employee.getEmployeeName() != null && !employee.getEmployeeName().isEmpty()) {
                 originalEmployee.setEmployeeName(employee.getEmployeeName());
             }
-            if (Objects.nonNull(employee.getEmployeeSalary()) && employee.getEmployeeSalary() != 0) {
+            // Update employee salary if it's greater than 0
+            if (employee.getEmployeeSalary() > 0) {
                 originalEmployee.setEmployeeSalary(employee.getEmployeeSalary());
             }
             return employeeRepository.save(originalEmployee);
-        }
-        return null;
+        }).orElseThrow(() -> new RuntimeException("Employee not found with id: " + id));
     }
 
     @Override
-    public String deleteDepartmentById(Long id) {
-        if (employeeRepository.findById(id).isPresent()) {
+    public String deleteEmployeeById(Long id) {
+        if (employeeRepository.existsById(id)) {
             employeeRepository.deleteById(id);
             return "Employee deleted successfully";
         }
